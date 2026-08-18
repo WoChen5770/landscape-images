@@ -1,0 +1,124 @@
+name: Build EasyTier Landscape Image
+
+on:
+  workflow_dispatch:
+    inputs:
+      easytier_version:
+        description: "EasyTier version (leave empty for latest)"
+        required: false
+        default: ""
+      landscape_version:
+        description: "Landscape version (leave empty for latest)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/landscape-easytier
+
+jobs:
+  resolve-versions:
+    runs-on: ubuntu-latest
+    outputs:
+      easytier_version: ${{ steps.resolve.outputs.easytier }}
+      landscape_version: ${{ steps.resolve.outputs.landscape }}
+    steps:
+      - name: Resolve versions
+        id: resolve
+        run: |
+          LAND_INPUT="${{ github.event.inputs.landscape_version }}"
+          if [ -n "$LAND_INPUT" ]; then
+            LAND_VER="$LAND_INPUT"
+          else
+            LAND_VER=$(curl -sf https://api.github.com/repos/ThisSeanZhang/landscape/releases/latest | python3 -c "import sys,json; print(json.load(sys.stdin)['tag_name'])")
+          fi
+          echo "landscape=$LAND_VER" >> $GITHUB_OUTPUT
+          echo "::notice::Landscape version: $LAND_VER"
+
+          ET_INPUT="${{ github.event.inputs.easytier_version }}"
+          if [ -n "$ET_INPUT" ]; then
+            ET_VER="$ET_INPUT"
+          else
+            ET_VER=$(curl -sf https://api.github.com/repos/EasyTier/EasyTier/releases/latest | python3 -c "import sys,json; print(json.load(sys.stdin)['tag_name'])")
+          fi
+          echo "easytier=$ET_VER" >> $GITHUB_OUTPUT
+          echo "::notice::EasyTier version: $ET_VER"
+
+      - name: Print resolved versions
+        run: |
+          echo "## Resolved Versions" >> $GITHUB_STEP_SUMMARY
+          echo "- EasyTier: \`${{ steps.resolve.outputs.easytier }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Landscape: \`${{ steps.resolve.outputs.landscape }}\`" >> $GITHUB_STEP_SUMMARY
+
+  build:
+    needs: resolve-versions
+    runs-on: ubuntu-latest
+    env:
+      ET_VER: ${{ needs.resolve-versions.outputs.easytier_version }}
+      LAND_VER: ${{ needs.resolve-versions.outputs.landscape_version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify versions
+        run: |
+          echo "EasyTier version: $ET_VER"
+          echo "Landscape version: $LAND_VER"
+          if [ -z "$ET_VER" ] || [ -z "$LAND_VER" ]; then
+            echo "::error::Version resolution failed!"
+            exit 1
+          fi
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=${{ env.LAND_VER }}-${{ env.ET_VER }}
+            type=raw,value=latest
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ./easytier
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            EASYTIER_VERSION=${{ env.ET_VER }}
+            LANDSCAPE_VERSION=${{ env.LAND_VER }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Summary
+        if: success()
+        run: |
+          TAG="${LAND_VER}-${ET_VER}"
+          echo "## Build Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **EasyTier**: \`${ET_VER}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Landscape**: \`${LAND_VER}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Platforms**: linux/amd64, linux/arm64" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tag**: \`${TAG}\`, \`latest\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "docker pull ${IMAGE_NAME}:${TAG}" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
