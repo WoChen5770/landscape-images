@@ -29,7 +29,6 @@ jobs:
       - name: Resolve versions
         id: resolve
         run: |
-          # Resolve Landscape version
           LAND_INPUT="${{ github.event.inputs.landscape_version }}"
           if [ -n "$LAND_INPUT" ]; then
             LAND_VER="$LAND_INPUT"
@@ -39,7 +38,6 @@ jobs:
           echo "landscape=$LAND_VER" >> $GITHUB_OUTPUT
           echo "::notice::Landscape version: $LAND_VER"
 
-          # Resolve v2rayA version
           V2RAYA_INPUT="${{ github.event.inputs.v2raya_version }}"
           if [ -n "$V2RAYA_INPUT" ]; then
             V2RAYA_VER="$V2RAYA_INPUT"
@@ -70,7 +68,7 @@ jobs:
           echo "v2rayA version: $V2RAYA_VER"
           echo "Landscape version: $LAND_VER"
           if [ -z "$V2RAYA_VER" ] || [ -z "$LAND_VER" ]; then
-            echo "::error::Version resolution failed! v2rayA='$V2RAYA_VER' Landscape='$LAND_VER'"
+            echo "::error::Version resolution failed!"
             exit 1
           fi
 
@@ -93,7 +91,7 @@ jobs:
         with:
           images: ${{ env.IMAGE_NAME }}
           tags: |
-            type=raw,value=${{ env.LAND_VER }}
+            type=raw,value=${{ env.LAND_VER }}-${{ env.V2RAYA_VER }}
             type=raw,value=latest
 
       - name: Build and push
@@ -113,13 +111,14 @@ jobs:
       - name: Summary
         if: success()
         run: |
+          TAG="${LAND_VER}-${V2RAYA_VER}"
           echo "## Build Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **v2rayA**: \`${{ env.V2RAYA_VER }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Landscape**: \`${{ env.LAND_VER }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **v2rayA**: \`${V2RAYA_VER}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Landscape**: \`${LAND_VER}\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Platforms**: linux/amd64, linux/arm64" >> $GITHUB_STEP_SUMMARY
-          echo "- **Tags**: \`${{ env.LAND_VER }}\`, \`latest\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tag**: \`${TAG}\`, \`latest\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "```" >> $GITHUB_STEP_SUMMARY
-          echo "docker pull ${{ env.IMAGE_NAME }}:${{ env.LAND_VER }}" >> $GITHUB_STEP_SUMMARY
-          echo "```" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "docker pull ${IMAGE_NAME}:${TAG}" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
