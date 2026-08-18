@@ -18,16 +18,18 @@ RUN apk add --no-cache \
     coreutils
 
 # ---- v2rayA (amd64->x64, arm64->arm64) ----
+# NOTE: GitHub tag has 'v' prefix (v2.4.11) but asset names do NOT (v2raya_linux_x64_2.4.11)
 RUN set -eux; \
     case "${TARGETARCH}" in \
       amd64)  V2RAYA_ARCH="x64"  ;; \
       arm64)  V2RAYA_ARCH="arm64" ;; \
       *)      echo "Unsupported arch: ${TARGETARCH}"; exit 1 ;; \
     esac; \
+    V2RAYA_VER="${V2RAYA_VERSION#v}"; \
     wget -q -O /usr/bin/v2raya \
-      "https://github.com/v2rayA/v2rayA/releases/download/${V2RAYA_VERSION}/v2raya_linux_${V2RAYA_ARCH}_${V2RAYA_VERSION}"; \
+      "https://github.com/v2rayA/v2rayA/releases/download/${V2RAYA_VERSION}/v2raya_linux_${V2RAYA_ARCH}_${V2RAYA_VER}"; \
     wget -q -O /usr/bin/v2raya_core \
-      "https://github.com/v2rayA/v2rayA/releases/download/${V2RAYA_VERSION}/v2raya_core_linux_${V2RAYA_ARCH}_${V2RAYA_VERSION}"; \
+      "https://github.com/v2rayA/v2rayA/releases/download/${V2RAYA_VERSION}/v2raya_core_linux_${V2RAYA_ARCH}_${V2RAYA_VER}"; \
     chmod +x /usr/bin/v2raya /usr/bin/v2raya_core
 
 # ---- Landscape redirect_pkg_handler ----
