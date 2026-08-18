@@ -32,7 +32,7 @@ Landscape (Host)
 ### 拉取镜像
 
 ```bash
-docker pull ghcr.io/wuchen5770/v2raya-landscape:latest
+docker pull ghcr.io/wuchen5770/landscape-v2raya:latest
 ```
 
 ### docker-compose 使用
@@ -40,7 +40,7 @@ docker pull ghcr.io/wuchen5770/v2raya-landscape:latest
 ```yaml
 services:
   v2raya-exit:
-    image: ghcr.io/wuchen5770/v2raya-landscape:latest
+    image: ghcr.io/wuchen5770/landscape-v2raya:latest
     container_name: v2raya-exit
     privileged: true
     restart: unless-stopped
@@ -90,7 +90,7 @@ LANDSCAPE_VER=$(curl -s https://api.github.com/repos/ThisSeanZhang/landscape/rel
 docker build \
   --build-arg V2RAYA_VERSION=$V2RAYA_VER \
   --build-arg LANDSCAPE_VERSION=$LANDSCAPE_VER \
-  -t v2raya-landscape \
+  -t landscape-v2raya \
   ./v2raya
 ```
 
