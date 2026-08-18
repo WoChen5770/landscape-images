@@ -1,0 +1,109 @@
+name: Build v2rayA Landscape Image
+
+on:
+  workflow_dispatch:
+    inputs:
+      v2raya_version:
+        description: "v2rayA version (leave empty for default)"
+        required: false
+        default: ""
+      landscape_version:
+        description: "Landscape version (leave empty for latest)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/v2raya-landscape
+
+jobs:
+  resolve-versions:
+    runs-on: ubuntu-latest
+    outputs:
+      v2raya_version: ${{ steps.resolve.outputs.v2raya }}
+      landscape_version: ${{ steps.resolve.outputs.landscape }}
+    steps:
+      - name: Resolve versions
+        id: resolve
+        run: |
+          # Resolve Landscape version
+          LAND_INPUT="${{ github.event.inputs.landscape_version }}"
+          if [ -n "$LAND_INPUT" ]; then
+            echo "landscape=$LAND_INPUT" >> $GITHUB_OUTPUT
+            echo "Landscape version (manual): $LAND_INPUT"
+          else
+            LAND_VER=$(curl -s https://api.github.com/repos/ThisSeanZhang/landscape/releases/latest | grep '"tag_name"' | sed 's/.*: "\(v[^"]*\)".*/\1/')
+            echo "landscape=$LAND_VER" >> $GITHUB_OUTPUT
+            echo "Landscape version (auto): $LAND_VER"
+          fi
+
+          # Resolve v2rayA version
+          V2RAYA_INPUT="${{ github.event.inputs.v2raya_version }}"
+          if [ -n "$V2RAYA_INPUT" ]; then
+            echo "v2raya=$V2RAYA_INPUT" >> $GITHUB_OUTPUT
+            echo "v2rayA version (manual): $V2RAYA_INPUT"
+          else
+            V2RAYA_VER=$(curl -s https://api.github.com/repos/v2rayA/v2rayA/releases/latest | grep '"tag_name"' | sed 's/.*: "\(v[^"]*\)".*/\1/')
+            echo "v2raya=$V2RAYA_VER" >> $GITHUB_OUTPUT
+            echo "v2rayA version (auto): $V2RAYA_VER"
+          fi
+
+  build:
+    needs: resolve-versions
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=${{ needs.resolve-versions.outputs.landscape_version }}
+            type=raw,value=latest
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ./v2raya
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            V2RAYA_VERSION=${{ needs.resolve-versions.outputs.v2raya_version }}
+            LANDSCAPE_VERSION=${{ needs.resolve-versions.outputs.landscape_version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Summary
+        run: |
+          echo "## Build Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **v2rayA**: ${{ needs.resolve-versions.outputs.v2raya_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Landscape**: ${{ needs.resolve-versions.outputs.landscape_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Platforms**: linux/amd64, linux/arm64" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tags**: \`${{ needs.resolve-versions.outputs.landscape_version }}\`, \`latest\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Pull:" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "docker pull ${{ env.IMAGE_NAME }}:${{ needs.resolve-versions.outputs.landscape_version }}" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
