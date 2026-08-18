@@ -1,13 +1,10 @@
 # ============================================================
 # v2rayA + Landscape redirect_pkg_handler (Alpine, multi-arch)
 # ============================================================
-# 用法:
-#   docker build --build-arg V2RAYA_VERSION=x.x.x --build-arg LANDSCAPE_VERSION=vx.x.x -t v2raya-landscape ./v2raya
-# ============================================================
 FROM alpine:3.20
 
-ARG V2RAYA_VERSION
-ARG LANDSCAPE_VERSION
+ARG V2RAYA_VERSION=v2.4.11
+ARG LANDSCAPE_VERSION=v0.23.0
 ARG TARGETARCH
 
 # ---- 运行时依赖 ----
@@ -18,8 +15,7 @@ RUN apk add --no-cache \
     iptables-legacy \
     wget \
     ca-certificates \
-    coreutils \
-    sed
+    coreutils
 
 # ---- v2rayA (双架构: amd64→x64, arm64→arm64) ----
 RUN set -eux; \
